@@ -1,27 +1,25 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_bzero.c                                         :+:      :+:    :+:   */
+/*   ft_lstnew_bonus.c                                  :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: acornia <acornia@student.42madrid.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/09/24 13:24:46 by acornia           #+#    #+#             */
-/*   Updated: 2026/09/30 14:00:59 by acornia          ###   ########.fr       */
+/*   Created: 2026/09/30 15:36:15 by acornia           #+#    #+#             */
+/*   Updated: 2026/10/01 15:34:51 by acornia          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "libft.h"
 
-/*La función ft_bzero (de byte zero) sirve para rellenar con ceros 
-('\0') un bloque de memoria.*/
-
-void	ft_bzero(void *s, size_t n)
+t_list	*ft_lstnew(void *content)
 {
-	unsigned char	*ptr;
-	size_t			i;
+	t_list	*new;
 
-	ptr = (unsigned char *)s;
-	i = 0;
-	while (i < n)
-		ptr[i++] = '\0';
+	new = (t_list *)malloc(sizeof(t_list));
+	if (!new)
+		return (NULL);
+	new->content = content;
+	new->next = NULL;
+	return (new);
 }

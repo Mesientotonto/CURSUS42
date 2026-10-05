@@ -1,29 +1,37 @@
 /* ************************************************************************** */
 /*                                                                            */
 /*                                                        :::      ::::::::   */
-/*   ft_striteri.c                                      :+:      :+:    :+:   */
+/*   ft_lstmap_bonus.c                                  :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
 /*   By: acornia <acornia@student.42madrid.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
-/*   Created: 2026/09/28 10:00:42 by acornia           #+#    #+#             */
-/*   Updated: 2026/09/28 16:05:48 by acornia          ###   ########.fr       */
+/*   Created: 2026/10/05 10:33:29 by acornia           #+#    #+#             */
+/*   Updated: 2026/10/05 10:37:55 by acornia          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "libft.h"
 
-/*La función ft_striteri (de string iterator with index) recorre cada carácter 
-de una cadena de texto y le aplica una función especificada, modificando la 
-cadena original en el mismo lugar (in-place).*/
-
-void	ft_striteri(char *s, void (*f)(unsigned int, char*))
+t_list	*ft_lstmap(t_list *lst, void *(*f)(void *), void (*del)(void *))
 {
-	unsigned int	i;
+	t_list	*new_list;
+	t_list	*new_node;
+	void	*new_content;
 
-	i = 0;
-	while (s[i] != '\0')
+	new_list = NULL;
+	while (lst != NULL)
 	{
-		f(i, &s[i]);
-		i++;
+		new_content = f(lst->content);
+		new_node = ft_lstnew(new_content);
+		if (!new_node)
+		{
+			if (new_content)
+				del(new_content);
+			ft_lstclear(&new_list, del);
+			return (NULL);
+		}
+		ft_lstadd_back(&new_list, new_node);
+		lst = lst->next;
 	}
+	return (new_list);
 }

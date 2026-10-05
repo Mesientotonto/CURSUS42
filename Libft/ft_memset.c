@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ft_memset.c                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: acornia <acornia@student.42.fr>            +#+  +:+       +#+        */
+/*   By: acornia <acornia@student.42madrid.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/24 12:11:16 by acornia           #+#    #+#             */
-/*   Updated: 2026/09/28 10:39:16 by acornia          ###   ########.fr       */
+/*   Updated: 2026/10/01 11:15:56 by acornia          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,8 +20,8 @@ void	*ft_memset(void *s, int c, size_t n)
 	unsigned char	*ptr;
 	size_t			i;
 
-	ptr = (unsigned char *)s;
 	i = 0;
+	ptr = (unsigned char *)s;
 	while (i < n)
 		ptr[i++] = (unsigned char)c;
 	return (s);

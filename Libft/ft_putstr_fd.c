@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ft_putstr_fd.c                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: acornia <acornia@student.42.fr>            +#+  +:+       +#+        */
+/*   By: acornia <acornia@student.42madrid.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/25 15:43:50 by acornia           #+#    #+#             */
-/*   Updated: 2026/09/28 10:48:55 by acornia          ###   ########.fr       */
+/*   Updated: 2026/09/28 15:58:53 by acornia          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,8 +19,5 @@ de caracteres y la escribe completa en el descriptor de archivo
 void	ft_putstr_fd(char *s, int fd)
 {
 	while (*s != '\0')
-	{
-		ft_putchar_fd(*s, fd);
-		s++;
-	}
+		ft_putchar_fd(*(s++), fd);
 }

@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   ft_calloc.c                                        :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: acornia <acornia@student.42.fr>            +#+  +:+       +#+        */
+/*   By: acornia <acornia@student.42madrid.com>     +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/09/25 12:39:03 by acornia           #+#    #+#             */
-/*   Updated: 2026/09/28 10:34:34 by acornia          ###   ########.fr       */
+/*   Updated: 2026/10/01 16:13:45 by acornia          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,8 +19,6 @@ void	*ft_calloc(size_t count, size_t size)
 {
 	void	*ptr;
 
-	if (count != 0 && size > (size_t)-1 / count)
-		return (NULL);
 	ptr = malloc(count * size);
 	if (!ptr)
 		return (NULL);
