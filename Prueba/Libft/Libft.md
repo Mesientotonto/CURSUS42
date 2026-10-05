@@ -252,17 +252,44 @@ Diferencia entre **t_list \*** y **t_list\*\*** :
 
 ![[Pasted image 20261001115450.png]]
 
-**t_list \*new_node** = Declaramos un puntero que almacenara la direccion de memoria donde vivira nuestra nueva estructura **t_list**.
+**t_list \*new** = Declaramos un puntero que almacenara la direccion de memoria donde vivira nuestra nueva estructura **t_list**.
 
 **new = (t_list \*)malloc(sizeof(t_list));** = Llamamos a malloc pidiendo el tamaño exacto que ocupa la estructura t_list(16 bytes). Si la reserva es exitosa, malloc devuelve un puntero void \* a esa zona de memoria, el cual casteamos a **(t_list \*)**.
 
-**if (!new) return (NULL)** = Si el sistema se queda sin RAM, malloc devuelve NULL. Si no comprobamos esto e intentamos escribir en new->content, el programa rompera inmediatamente con un segmentation fault.
+**if (!new) return (NULL)** = Si el sistema se queda sin RAM, malloc devuelve NULL. Si no comprobamos esto e intentamos escribir en new->content, el programa se rompera inmediatamente con un segmentation fault.
 
 **new->content = content** = Asignamos el puntero que nos han pasado por parametro al campo content del nuevo nodo. Nota que no duplicamos los datos, simplemente guardamos la direccion de memoria donde residen.
 
 **new->next = NULL** = Todo nodo recien creado nace huerfano. Inicializamos su puntero next a NULL. Esto indica que, por ahora, no hay nigun nodo detras de el y evita que contenga "basura" de la memoria.
 
 **return (new)** = Devolvemos la direccion de la estructura que acabamos de construir.
+
+Para entender qué significa realmente `new->content = content;`, hay que olvidar por un momento la palabra "variable" y pensar estrictamente en **direcciones de memoria (punteros)**.
+
+`content` en `ft_lstnew(void *content)` no es una variable que guarde un número o un texto dentro, **es una dirección de memoria** (un número hexadecimal como `0x7ffee3b4` que apunta a donde vive ese dato en la RAM).
+
+Cuando escribes `new->content = content;` paso a paso, ocurre lo siguiente:
+
+### 1. El nodo es una "caja vacía" con etiquetas
+
+Cuando pides memoria para un nodo (`t_list *new = malloc(sizeof(t_list));`), creas un bloque en el _heap_ que tiene dos huecos (o etiquetas):
+
+- `new->content` (hueco para guardar un puntero).
+    
+- `new->next` (hueco para guardar otro puntero).
+    
+
+### 2. Copiar el puntero (no el contenido)
+
+Imagina que tienes una hoja de papel (una variable) con un número escrito, y esa hoja está en la dirección de memoria `0x1000`. Cuando haces `new->content = content;`, **no estás copiando el número del papel dentro del nodo**. Lo que estás haciendo es copiar **la dirección** `0x1000` dentro del hueco `content` del nodo.
+
+Es decir, el nodo ahora tiene una flecha que apunta directamente a esa hoja de papel.
+
+### ¿Por qué se usa un `void *`?
+
+Como la estructura `t_list` no sabe si vas a guardar un número entero, una estructura compleja o una cadena de texto, usa un `void *` (un puntero genérico). Significa literalmente: _"Guarda aquí dentro cualquier dirección de memoria que te pase, a mí no me importa qué hay al final de esa dirección, yo solo guardo la ruta"_.
+
+Por eso, cuando quieras recuperar o usar ese contenido en el futuro, tendrás que **hacer un _cast_** (un cambio de tipo explícito) para recordarle al compilador qué hay guardado en esa dirección.
 # FT_LSTSIZE_BONUS------------------------------------------
 
 ![[Pasted image 20261005112732.png]]
@@ -280,6 +307,24 @@ Cuenta cuántos elementos hay encadenados. Al recibir un puntero simple (`t_list
 **lst = lst->next** = Sobrescribes la variable local `lst` con la dirección guardada en el campo `next` del nodo actual. Esto desplaza la lectura al siguiente elemento.
 
 **return (count)** = Devuelves la suma total.
+
+Para entender `lst = lst->next;`, volvamos a la metáfora del tren de mercancías.
+
+Imagina que estás parado físicamente en un vagón de ese tren.
+
+- El vagón en el que estás ahora mismo es **`lst`**.
+    
+- Dentro de ese vagón hay un papel (el puntero `next`) que tiene escrita **la dirección exacta del siguiente vagón**.
+    
+
+Cuando escribes `lst = lst->next;`, lo que estás haciendo en la vida real es **desplazarte físicamente al siguiente vagón**.
+
+Paso a paso, la instrucción funciona así:
+
+1. **`lst->next`**: Miras el papel que hay en el vagón actual y lees la dirección del vagón de al lado.
+    
+2. **`lst = ...`**: Agarras esa dirección y se la asignas a tu variable `lst`. Ahora, la variable deja de apuntar al vagón viejo y pasa a apuntar al nuevo. El vagón viejo queda atrás.
+
 # FT_LSTLAST_BONUS------------------------------------------
 
 ![[Pasted image 20261005113741.png]]
