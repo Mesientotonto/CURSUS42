@@ -2,15 +2,13 @@
 * [[#FT_STRCHR--------------------------------------------------------]]
 * [[#FT_MEMSET--------------------------------------------------------]]
 * [[#FT_MEMMOVE-----------------------------------------------------]]
-* [[#FT_STRLCAT--------------------------------------------------------]]
 * [[#FT_CALLOC---------------------------------------------------------]]
 * [[#FT_STRDUP---------------------------------------------------------]]
-* [[#FT_SUBSTR---------------------------------------------------------]]
-* [[#FT_PUTCHAR_FD---------------------------------------------------]]
-* [[#FT_PUTSTR_FD-----------------------------------------------------]]
-* [[#FT_PUTENDL_FD----------------------------------------------]]
 * [[#FT_STRITERI---------------------------------------------------]]
-* [[#FT_PUTNBR_FD-----------------------------------------------]]
+* [[#FT_STRJOIN---------------------------------------------------]]
+* [[#FT_STRLCAT---------------------------------------------------]]
+* [[#FT_STRNSTR---------------------------------------------------]]
+* [[#FT_STRTRIM---------------------------------------------------]]
 * [[#FT_LSTNEW_BONUS------------------------------------------]]
 * [[#FT_LSTSIZE_BONUS------------------------------------------]]
 * [[#FT_LSTLAST_BONUS------------------------------------------]]
@@ -68,16 +66,6 @@ DESCRIPTION
 
 En el caso de memcpy se iba de delante hacia atras, sin tener en cuanta si se solapan los contenidos. Ya que al ser direcciones de memoria pueden a llegar a solapar, entonces haces de derecha a izquierda, en vez de izquierda a derecha.
 
-## FT_STRLCAT--------------------------------------------------------
-
-![[Pasted image 20260925115320.png]]
-
-En este caso el retorno es el tamaño de src y de dest, primero verificamos que si no hay dest o si el tamaño es 0 pues te devuelve el tamaño de src.
-
-Si el tamaño es menor que el tamaño de dest, pues devuelve el tamaño dado mas la longitud de src, esto es basicamente para saber si el tamaño dado no ha sido suficiente.
-
-Y ya por ultimo se concadenan.
-
 ## FT_CALLOC---------------------------------------------------------
 
        The calloc() function allocates memory for an array of nmemb elements of
@@ -127,27 +115,6 @@ Para crear ft_calloc, necesitas combinar dos funciones que ya conoces de tu libf
 
 **ft_memcpy(dup, s, len + 1)** = Con la memoria ya resrvada copias s en dup.
 
-## FT_SUBSTR---------------------------------------------------------
-
-![[Pasted image 20260925141400.png]]
-
-## FT_PUTCHAR_FD---------------------------------------------------
-
-![[Pasted image 20260925142746.png]]
-
-![[Pasted image 20260925153349.png]]
-
-## FT_PUTSTR_FD-----------------------------------------------------
-
-![[Pasted image 20260925154510.png]]
-
-![[Pasted image 20260928094334.png]]
-
-# FT_PUTENDL_FD----------------------------------------------
-
-![[Pasted image 20260928094536.png]]
-
-![[Pasted image 20260928095652.png]]
 
 # FT_STRITERI---------------------------------------------------
 
@@ -155,13 +122,555 @@ Para crear ft_calloc, necesitas combinar dos funciones que ya conoces de tu libf
 
 ![[Pasted image 20260928100511.png]]
 
-# FT_PUTNBR_FD-----------------------------------------------
 
-![[Pasted image 20260928100621.png]]
+# FT_STRJOIN---------------------------------------------------
 
-![[Pasted image 20261005113122.png]]
+![[Pasted image 20261006102705.png]]
 
-Es lo mismo que un putnbr normal y corriente lo unico que cambia es donde mostramos el resultado.
+![[Pasted image 20261006102633.png]]
+
+El uso conjunto de `ft_strlcpy` y `ft_strlcat` en `ft_strjoin` responde a un criterio estrictamente técnico de **seguridad, robustez y reutilización de código**:
+
+1. **Reutilización de funciones propias:** Al haber programado previamente `ft_strlcpy` y `ft_strlcat` en las partes obligatorias de la librería, estás utilizando herramientas fiables y ya testeadas para manipular cadenas, evitando reinventar la rueda o duplicar bucles de copia manual dentro de esta función.
+    
+2. **Control de límites y desbordamientos:** A diferencia de las funciones clásicas de la `libc` (`strcpy` o `strcat`), las versiones seguras con control de tamaño (_BSD style_) reciben por parámetro el tamaño total del búfer. Esto garantiza que nunca se escribirá más allá de la memoria reservada con `malloc`, previniendo de forma nativa los desbordamientos de búfer (_buffer overflows_).
+    
+3. **Garantía absoluta del byte nulo (`\0`):** Tanto `ft_strlcpy` como `ft_strlcat` aseguran de manera estricta que la cadena resultante termine correctamente con un carácter nulo, minimizando el riesgo de errores lógicos o fallos de lectura al procesar el texto resultante.
+
+# FT_STRLCAT---------------------------------------------------
+
+![[Pasted image 20261006103525.png]]
+
+Vamos a desarmar **`ft_strlcat`** línea a línea a partir de la captura que has subido. El objetivo de esta función no es solo "pegar dos textos", sino hacerlo de forma **100% segura contra desbordamientos de búfer (_buffer overflow_)** y devolviendo un valor matemático preciso que le permite al programador saber si la cadena se tuvo que cortar (truncar) o si cupo entera.
+
+### 1. La firma y el contrato de la función
+
+C
+
+```
+size_t  ft_strlcat(char *dst, const char *src, size_t size)
+```
+
+- **`char *dst`:** Búfer de destino. Es donde ya hay una cadena guardada y donde vamos a enganchar `src` al final.
+    
+- **`const char *src`:** Cadena de origen. Llleva `const` porque solo vamos a leer sus caracteres para copiarlos, jamás a modificarlos.
+    
+- **`size_t size`:** Es el **tamaño total en bytes** que se reservó en memoria para `dst` (no la longitud del texto que contiene ahora, sino el tamaño del espacio en el _heap_ o en el _stack_).
+    
+- **Retorno `size_t`:** Según la norma de BSD, `strlcat` **siempre devuelve la longitud total que intentó crear**, es decir: `longitud_inicial_de_dst + longitud_de_src`. Si el número que devuelve es mayor o igual a `size`, el programador sabe que el texto no cupo entero y se truncó.
+    
+
+### 2. Declaración de variables
+
+C
+
+```
+    size_t  dst_len;
+    size_t  src_len;
+    size_t  i;
+```
+
+- **`dst_len` y `src_len`:** Guardarán las longitudes reales de `dst` y `src` medidas con `ft_strlen`.
+    
+- **`i`:** Contador del bucle de copia que representa cuántos caracteres de `src` llevamos pegados.
+    
+- Usamos `size_t` en las tres porque van a operarse e igualarse directamente con `size`.
+    
+
+### 3. Medición inicial y protección de puntero nulo
+
+C
+
+```
+    src_len = ft_strlen(src);
+    if (!dst && size == 0)
+        return (src_len);
+```
+
+- **`src_len = ft_strlen(src);`:** Calculamos de entrada cuánto mide la cadena de origen.
+    
+- **`if (!dst && size == 0)`:** Es una protección para un caso de borde específico que prueban los testers automáticos (como Francinette): si nos pasan un puntero `dst` que es `NULL` pero nos indican que el tamaño del búfer es `0`, no debemos intentar leer `dst` (causaría un _segmentation fault_ al medir su longitud). La especificación dicta que en ese caso extremo se devuelve la longitud de `src`.
+    
+
+### 4. Medición de `dst` y la barrera de seguridad
+
+C
+
+```
+    dst_len = ft_strlen(dst);
+    if (size <= dst_len)
+        return (size + src_len);
+```
+
+- **`dst_len = ft_strlen(dst);`:** Obtenemos dónde termina la cadena actual en `dst`.
+    
+- **`if (size <= dst_len)`:** Esta es una comprobación crítica. Si el tamaño total que nos dicen que tiene el búfer (`size`) es menor o igual que los caracteres que ya hay dentro de `dst`, significa que **no hay espacio para concatenar nada** (o que el `size` proporcionado es incorrecto y no cubre ni la cadena inicial).
+    
+- **`return (size + src_len);`:** Cuando `size <= dst_len`, la especificación de `strlcat` exige no escribir nada en memoria y devolver exactamente `size + src_len`.
+    
+
+### 5. El bucle de copia y la condición `size - 1`
+
+C
+
+```
+    i = 0;
+    while (src[i] != '\0' && (dst_len + i) < (size - 1))
+    {
+        dst[dst_len + i] = src[i];
+        i++;
+    }
+```
+
+- **`i = 0;`:** Empezamos a leer `src` desde su posición 0.
+    
+- **`dst_len + i`:** Es la posición física en el array `dst` donde vamos a escribir. Como `dst` ya tiene `dst_len` caracteres, la primera escritura (`i = 0`) cae exactamente en `dst[dst_len]`, pisando el antiguo `\0` de `dst` para continuar la cadena.
+    
+- **`(dst_len + i) < (size - 1)` (EL PORQUÉ DEL `- 1`):**
+    
+    - Queremos copiar el máximo número de caracteres posibles sin desbordar `dst`.
+        
+    - Si el búfer mide `size`, las posiciones válidas van de `0` a `size - 1`.
+        
+    - La **última posición del búfer (`dst[size - 1]`) está estrictamente reservada para el byte nulo `\0`**.
+        
+    - Por eso, para escribir caracteres reales de texto, la posición `dst_len + i` tiene que ser estrictamente menor que `size - 1`. En cuanto la siguiente posición a escribir sea `size - 1`, el bucle se detiene para no invadir la casilla del `\0` final.
+        
+
+### 6. Cierre con byte nulo y valor de retorno
+
+C
+
+```
+    dst[dst_len + i] = '\0';
+    return (dst_len + src_len);
+```
+
+- **`dst[dst_len + i] = '\0';`:** Cuando el bucle termina (ya sea porque se acabaron los caracteres de `src` o porque alcanzamos el límite de espacio), colocamos obligatoriamente el carácter nulo en el índice `dst_len + i`. Como el bucle se detuvo como máximo en `dst_len + i == size - 1`, este `\0` quedará escrito dentro del límite del búfer.
+    
+- **`return (dst_len + src_len);`:** Se devuelve la suma de las dos longitudes originales.
+    
+
+### Mapeo mental para programarlo sin ayuda
+
+1. **Obtén las longitudes:** Mide `src` y `dst`.
+    
+2. **Protege los bordes:** Si `size <= dst_len`, no toques la memoria y devuelve `size + src_len`.
+    
+3. **Copia con margen para el `\0`:** Escribe `src[i]` en `dst[dst_len + i]` mientras `(dst_len + i) < size - 1`.
+    
+4. **Cierra siempre la cadena:** Pon el `\0` al final de lo copiado y devuelve `dst_len + src_len`.
+# FT_STRNSTR---------------------------------------------------
+
+![[Pasted image 20261006110458.png]]
+
+Entendido. Vamos a destripar **`ft_strnstr`** exactamente con el código de tu captura, analizando la mecánica interna de memoria, la lógica de los índices y por qué cada instrucción está escrita de esa forma específica.
+
+### 1. El objetivo técnico y la firma de la función
+
+```
+char    *ft_strnstr(const char *big, const char *little, size_t len)
+```
+
+- **`char *` (tipo de retorno):** La función no devuelve un entero ni un booleano; debe devolver un **puntero** que apunta a la dirección exacta dentro de `big` donde comienza la primera coincidencia de `little`. Si no la encuentra, devuelve `NULL`.
+    
+- **`const char *big` y `const char *little`:** Usamos `const` porque la función solo va a **leer** estas cadenas, nunca a modificarlas.
+    
+- **`size_t len`:** Define la **frontera máxima de bytes** en la memoria de `big` que tenemos permitido inspeccionar.
+    
+
+### 2. Declaración de variables e índices
+
+```
+    size_t  s1;
+    size_t  s2;
+```
+
+- **`size_t` en lugar de `int`:** Como el parámetro `len` es de tipo `size_t` (un entero sin signo para representar tamaños en memoria), las variables que comparemos contra `len` deben ser del mismo tipo para evitar _warnings_ de compilación por comparar signed/unsigned.
+    
+- **Mecánica de los dos índices:**
+    
+    - **`s1`:** Es el índice del **bucle externo**. Representa el desplazamiento (_offset_) dentro de `big` desde donde vamos a intentar empezar a buscar la coincidencia.
+        
+    - **`s2`:** Es el índice del **bucle interno**. Representa la posición dentro de `little` que estamos validando carácter a carácter en ese intento.
+        
+
+### 3. La condición de borde o caso límite
+
+```
+    if (little[0] == '\0')
+        return ((char *)big);
+```
+
+- **Por qué se comprueba antes de nada:** Según la especificación del estándar `strnstr`, si la aguja que buscamos (`little`) es una cadena vacía (`""`), se considera encontrada desde el byte 0.
+    
+- **Por qué `(char *)big`:** `big` entró a la función como `const char *`. Sin embargo, el prototipo de retorno pide `char *` (un puntero no constante). Para evitar un aviso de compilación por descartar el cualificador `const`, se hace un _type cast_ explícito `(char *)big`.
+    
+
+### 4. El bucle externo: Recorriendo la cadena principal
+
+```
+    s1 = 0;
+    while (big[s1] != '\0' && s1 < len)
+```
+
+- **`s1 = 0;`:** Inicializamos la búsqueda desde el primer carácter de `big`.
+    
+- **`big[s1] != '\0'`:** Si llegamos al final de la cadena principal sin encontrar la aguja, no tiene sentido seguir buscando.
+    
+- **`s1 < len`:** Nos asegura que la cabeza de la búsqueda nunca sobrepase el límite máximo `len` establecido.
+    
+
+### 5. El bucle interno: Comprobación de coincidencia carácter a carácter
+
+```
+        s2 = 0;
+        while (big[s1 + s2] == little[s2] && (s1 + s2) < len)
+```
+
+Aquí está la clave algorítmica de la función:
+
+1. **`s2 = 0;`:** Cada vez que `s1` avanza un paso en `big`, **reiniciamos `s2` a 0** para empezar a comparar `little` desde su primer carácter.
+    
+2. **`big[s1 + s2] == little[s2]`:**
+    
+    - `s1` nos fija el punto de inicio en `big`.
+        
+    - `s2` nos sirve de desplazamiento en ambas cadenas simultáneamente.
+        
+    - Por ejemplo: si `s1 = 3`, comparamos `big[3 + 0]` con `little[0]`. Si coinciden, en la siguiente iteración `s2 = 1` y compararemos `big[3 + 1]` con `little[1]`.
+        
+3. **`(s1 + s2) < len`:** Es la **protección de memoria estricta**. Comprueba que la posición exacta que estamos leyendo en `big` (`s1 + s2`) no supere el límite `len`. Si la coincidencia requiere leer en el byte equivalente a `len` o superior, el bucle se detiene inmediatamente.
+    
+
+### 6. La verificación del éxito
+
+```
+            if (little[s2 + 1] == '\0')
+                return ((char *)&big[s1]);
+            s2++;
+```
+
+- **Por qué comprobar `little[s2 + 1] == '\0'`:**
+    
+    - Si el carácter actual `little[s2]` coincide con `big[s1 + s2]`, miramos si el **siguiente** carácter de `little` (`s2 + 1`) es el fin de cadena `\0`.
+        
+    - Si el siguiente carácter es `\0`, significa que el carácter actual `little[s2]` era el **último** carácter de la aguja. Por lo tanto, ¡hemos encontrado toda la subcadena completa!
+        
+- **`return ((char *)&big[s1]);`:**
+    
+    - No devolvemos `&big[s1 + s2]` (que sería donde terminó la cadena), sino **`&big[s1]`**, que es la dirección de memoria exacta **donde empezó** la coincidencia.
+        
+    - De nuevo, convertimos `&big[s1]` mediante `(char *)` para cumplir con el tipo de retorno sin _warnings_.
+        
+- **`s2++;`:** Si aún quedan más caracteres por comprobar en `little`, avanzamos `s2` para evaluar el siguiente par en la próxima iteración del bucle interno.
+    
+
+### 7. Avance del bucle externo y fallo de la búsqueda
+
+```
+        s1++;
+    }
+    return (NULL);
+```
+
+- **`s1++;`:** Si el bucle interno se rompe (ya sea porque no coincidió un carácter o porque se alcanzó el límite `len`), significa que la posición `s1` no era el inicio de la subcadena. Avanzamos `s1` en 1 byte para probar a buscar desde la siguiente letra de `big`.
+    
+- **`return (NULL);`:** Si el bucle externo termina completamente (porque llegamos al `\0` de `big` o porque `s1` alcanzó el límite `len`) sin haber activado el `return` del bucle interno, la subcadena no existe dentro del rango permitido. Devolvemos `NULL`.
+    
+
+### En resumen: Cómo debes visualizarlo mentalmente para programarlo tú solo
+
+1. **Caso nulo inicial:** Si `little` es `""`, devuelves `big`.
+    
+2. **Puntero móvil `s1`:** Vas probando letra por letra en `big` mientras no se acabe la cadena y estés dentro del rango `s1 < len`.
+    
+3. **Puntero de rastreo `s2`:** Desde la posición `s1`, vas mirando hacia adelante en `big` y en `little` a la vez (`s1 + s2` vs `s2`) sin pasarte nunca de `len`.
+    
+4. **Condición de victoria:** En el momento en que confirmes la coincidencia de un carácter y compruebes que el siguiente en `little` es `\0`, devuelves la dirección de inicio `&big[s1]`.
+
+# FT_STRTRIM---------------------------------------------------
+
+![[Pasted image 20261006123146.png]]
+
+Vamos a desglosar **`ft_strtrim`** línea por línea según la imagen que has adjuntado, analizando la estrategia algorítmica, el manejo de memoria y el porqué matemático de los límites.
+
+### 1. La idea matemática detrás del algoritmo
+
+El objetivo de `ft_strtrim` es eliminar los caracteres contenidos en el conjunto `set` que estén al **inicio** y al **final** de la cadena `s1`.
+
+En lugar de crear un búfer temporal e ir copiando y borrando caracteres sobre la marcha, la forma más elegante y eficiente de resolverlo consta de dos fases:
+
+1. **Calcular los dos límites:** Encontrar el índice donde **empieza** el texto útil (`start`) y el índice donde **termina** (`end`).
+    
+2. **Extraer el bloque útil:** Delegar la reserva de memoria (`malloc`) y la copia del fragmento resultante a la función `ft_substr(s1, start, len)`.
+    
+
+### 2. Firma de la función y tipos de datos
+
+C
+
+```
+char    *ft_strtrim(char const *s1, char const *set)
+```
+
+- **`char *` (retorno):** Debe devolver un puntero a una **nueva cadena reservada en el _heap_** con `malloc`.
+    
+- **`char const *s1` y `char const *set`:** Ambos punteros son constantes porque la función únicamente lee los caracteres de entrada; no modifica las cadenas originales.
+    
+
+### 3. Declaración de límites
+
+C
+
+```
+    size_t  start;
+    size_t  end;
+```
+
+- Usamos `size_t` porque `start` y `end` van a almacenar índices de posición dentro de una cadena y se compararán contra longitudes devueltas por `ft_strlen`. Evitamos mezclar enteros con signo y sin signo.
+    
+
+### 4. Recorte frontal: Búsqueda del índice `start`
+
+C
+
+```
+    start = 0;
+    while (s1[start] != '\0' && ft_strchr(set, s1[start]))
+        start++;
+```
+
+- **`start = 0;`:** Empezamos inspeccionando desde el primer carácter de `s1`.
+    
+- **`s1[start] != '\0'`:** Garantiza que no leamos fuera de la memoria si toda la cadena resulta ser de caracteres pertenecientes a `set` (en cuyo caso recorreríamos `s1` de principio a fin).
+    
+- **`ft_strchr(set, s1[start])`:**
+    
+    - Reutiliza tu propia función `ft_strchr`. Busca si el carácter actual `s1[start]` está presente en la cadena de basura `set`.
+        
+    - Si el carácter **sí** está en `set`, `ft_strchr` devuelve un puntero (que evalúa como _verdadero_ en C), por lo que la condición se cumple.
+        
+- **`start++;`:** Muestra que mientras el carácter sea "basura", el índice de inicio avanza un byte a la derecha. El bucle se detiene en cuanto encontramos el **primer carácter válido** (o llegamos al `\0`).
+    
+
+### 5. Recorte trasero: Búsqueda del índice `end`
+
+C
+
+```
+    end = ft_strlen(s1);
+    while (end > start && ft_strchr(set, s1[end - 1]))
+        end--;
+```
+
+- **`end = ft_strlen(s1);`:**
+    
+    - Inicializamos `end` con la **longitud total** de `s1`.
+        
+    - Es crucial entender que `end` no apunta al último carácter, sino al byte **inmediatamente posterior** (la posición del `\0` final).
+        
+- **`end > start`:**
+    
+    - Es la frontera de seguridad crítica. Evita que el índice `end` retroceda por debajo de `start`.
+        
+    - Si la cadena entera estaba compuesta por caracteres de `set`, el primer bucle avanzó `start` hasta el final. Esta condición impide que `end` siga decrementando y produzca un desbordamiento de memoria (_underflow_) al restarle a un `size_t`.
+        
+- **`ft_strchr(set, s1[end - 1])`:**
+    
+    - Inspecciona el carácter que está justo **antes** del límite actual (`s1[end - 1]`).
+        
+    - Si ese carácter pertenece a `set`, significa que es basura trasera.
+        
+- **`end--;`:** Si el carácter pertenece a `set`, retrocedemos el límite `end` un byte a la izquierda.
+    
+
+### 6. Extracción y reserva de memoria mediante `ft_substr`
+
+C
+
+```
+    return (ft_substr(s1, start, end - start));
+```
+
+En lugar de hacer un `malloc` manual, comprobar si es nulo y copiar con un bucle, se delega toda esa lógica en **`ft_substr`**:
+
+- **El prototipo de `ft_substr` es:** `char *ft_substr(char const *s, unsigned int start, size_t len)`
+    
+- **`s1`:** Le pasamos la cadena original.
+    
+- **`start`:** Le indicamos el índice desde donde debe empezar a copiar.
+    
+- **`end - start` (Cálculo de la longitud recortada):**
+    
+    - La diferencia entre el índice final e inicial representa la **longitud exacta de caracteres útiles** a copiar.
+        
+    - _Ejemplo práctico:_ Si `s1 = "xxHolaxx"`, `start` acaba valiendo `2` (la `'H'`) y `end` vale `6` (la posición tras la `'a'`). La longitud a extraer es `end - start = 6 - 2 = 4` bytes (exactamente los que ocupa `"Hola"`).
+        
+- **Manejo automático del `NULL`:** Si la asignación con `malloc` dentro de `ft_substr` falla, `ft_substr` devolverá `NULL`, cumpliendo automáticamente con el contrato de error de `ft_strtrim`.
+    
+
+### Resumen para construirlo por tu cuenta
+
+1. **Localiza el inicio (`start`):** Haz avanzar un índice desde `0` mientras el carácter actual pertenezca a `set`.
+    
+2. **Localiza el final (`end`):** Inicia en la longitud total (`strlen`) y retrocede mientras `end > start` y el carácter en `end - 1` pertenezca a `set`.
+    
+3. **Corta la subcadena:** Devuelve directamente el resultado de `ft_substr(s1, start, end - start)`.
+
+# FT_SUBSTR----------------------------------------------------
+
+![[Pasted image 20261006124541.png]]
+
+Vamos a desglosar **`ft_substr`** línea por línea según el código exacto de tu captura, analizando la gestión de memoria en el _heap_, la prevención de desbordamientos y el cálculo exacto de tamaños.
+
+### 1. El objetivo algorítmico y la firma
+
+C
+
+```
+char    *ft_substr(char const *s, unsigned int start, size_t len)
+```
+
+- **`char *` (retorno):** La función crea una nueva cadena independiente en la memoria dinámica (_heap_), por lo que debe devolver un puntero que apunte al primer byte de esa memoria.
+    
+- **`char const *s`:** Cadena de origen de donde vamos a recortar. Es `const` porque no la vamos a modificar, solo a leer.
+    
+- **`unsigned int start`:** El índice o posición dentro de `s` a partir del cual empieza la subcadena que queremos extraer.
+    
+- **`size_t len`:** La cantidad máxima de caracteres que nos piden copiar a partir de `start`.
+    
+
+### 2. Declaración de variables
+
+C
+
+```
+    char    *substr;
+    size_t  s_len;
+    size_t  i;
+```
+
+- **`substr`:** El puntero donde guardaremos la dirección de memoria que nos devuelva `malloc`.
+    
+- **`s_len`:** Guardará la longitud total de la cadena original `s` mediante `ft_strlen`.
+    
+- **`i`:** Índice de control para copiar los caracteres uno a uno dentro del bucle. Usamos `size_t` en `i` y `s_len` para que coincidan con el tipo de `len` al hacer comparaciones matemáticas.
+    
+
+### 3. Protección contra puntero nulo inicial
+
+C
+
+```
+    if (!s)
+        return (NULL);
+```
+
+- **Por qué se hace:** Si nos pasan `s = NULL`, intentar calcular su longitud con `ft_strlen(s)` causaría un _segmentation fault_ inmediato al intentar desreferenciar un puntero nulo. Se comprueba de entrada para abortar de manera segura devolviendo `NULL`.
+    
+
+### 4. Caso de borde: El índice `start` está fuera de rango
+
+C
+
+```
+    s_len = ft_strlen(s);
+    if (start >= s_len)
+        return (ft_strdup(""));
+```
+
+- **`s_len = ft_strlen(s);`:** Obtenemos la longitud de la cadena principal.
+    
+- **`if (start >= s_len)`:** Si nos piden empezar a cortar en una posición `start` que es mayor o igual a la longitud total de la cadena (por ejemplo, en la posición 10 de un texto que solo mide 5 letras), no hay texto que extraer.
+    
+- **`return (ft_strdup(""));`:** Según el sujeto de 42, no debemos devolver `NULL` en este caso, sino una **cadena vacía válida y asignada en memoria dinámica**. Usar `ft_strdup("")` ejecuta un `malloc(1)` interno que guarda un único byte `'\0'` y devuelve su puntero, permitiendo que la función receptora pueda hacer `free()` de forma segura.
+    
+
+### 5. Ajuste del tamaño `len` (Evitar _over-allocation_ / desbordamiento)
+
+C
+
+```
+    if (len > s_len - start)
+        len = s_len - start;
+```
+
+- **Por qué es clave:** Imagina que la cadena `s` mide 10 caracteres (`s_len = 10`), te piden empezar en `start = 7` y te piden un `len = 100`.
+    
+- A partir del índice 7 solo quedan **3 caracteres reales** (`10 - 7 = 3`).
+    
+- Si hiciéramos un `malloc` de 100 bytes, estaríamos desperdiciando memoria RAM inútilmente.
+    
+- Por eso, la resta `s_len - start` calcula **cuántos caracteres quedan verdaderamente disponibles** desde `start` hasta el final de la cadena. Si el `len` pedido supera ese disponible, **recortamos `len`** para que sea exactamente la cantidad real restante (`len = s_len - start`).
+    
+
+### 6. Reserva de memoria e inspección de asignación
+
+C
+
+```
+    substr = (char *)malloc(sizeof(char) * (len + 1));
+    if (!substr)
+        return (NULL);
+```
+
+- **`sizeof(char) * (len + 1)`:** Reservamos bytes para la cantidad de caracteres a copiar (`len`) más **1 byte imprescindible para el carácter nulo de cierre (`'\0'`)**.
+    
+- **`if (!substr)`:** Si el sistema operativo se queda sin memoria, `malloc` falla y devuelve `NULL`. Comprobarlo evita escribir en una dirección inválida y previene cierres inesperados (_crashes_).
+    
+
+### 7. Bucle de copia de la subcadena
+
+C
+
+```
+    i = 0;
+    while (i < len && s[start + i] != '\0')
+    {
+        substr[i] = s[start + i];
+        i++;
+    }
+```
+
+- **`i = 0;`:** Inicializamos la posición de destino en `substr`.
+    
+- **`i < len`:** Copiamos únicamente hasta alcanzar la cantidad de caracteres calculada en `len`.
+    
+- **`s[start + i] != '\0'`:** Es una doble protección por si la cadena de origen se acaba antes de lo esperado.
+    
+- **`s[start + i]`:** Leemos la cadena original aplicando el desplazamiento `start` más el índice actual `i`. Es decir, `substr[0]` recibe `s[start + 0]`, `substr[1]` recibe `s[start + 1]`, y así sucesivamente.
+    
+
+### 8. Cierre de cadena y retorno
+
+C
+
+```
+    substr[i] = '\0';
+    return (substr);
+```
+
+- **`substr[i] = '\0';`:** Al terminar la copia, escribimos explícitamente el byte nulo en la posición `i` (que equivale al índice inmediatamente posterior al último carácter copiado). Esto garantiza que `substr` sea una cadena bien terminada según la norma de C.
+    
+- **`return (substr);`:** Devolvemos la dirección de la memoria asignada.
+    
+
+### Esquema para reproducirlo de memoria
+
+1. **Protege entrada:** Comprueba si `s` es `NULL`.
+    
+2. **Mide la cadena:** Obtén `s_len`.
+    
+3. **Comprueba el inicio:** Si `start >= s_len`, devuelve `ft_strdup("")`.
+    
+4. **Ajusta la longitud:** Si `len > s_len - start`, iguala `len = s_len - start`.
+    
+5. **Reserva memoria:** `malloc(len + 1)` y protege el puntero asignado.
+    
+6. **Copia:** Copia `s[start + i]` en `substr[i]` mediante un bucle que finalice al cumplir `i < len`.
+    
+7. **Termina:** Añade `'\0'` al final (`substr[i] = '\0'`) y devuelve `substr`.
 # FT_LSTNEW_BONUS------------------------------------------
 
 ![[Pasted image 20261001115756.png]]
@@ -439,3 +948,11 @@ Construye una **nueva lista independiente** cuyos nodos albergan el resultado de
 **lst = lst->next** = Avanzas la lectura al siguiente elemento de la lista previa.
 
 **return (new_list)** = Devuelves la direccion del primer nodo de la lista generada.
+
+
+
+
+typedef
+
+structs
+
